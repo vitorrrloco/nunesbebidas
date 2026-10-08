@@ -438,12 +438,22 @@ seed();renderAll();
     authScreen.style.display='none'; appRoot.classList.remove('locked');
     window.firebaseUser=user;
     try{
+      // IMPORTANTE: use a mesma variável `db` da interface.
+      // A versão anterior escrevia em window.db, deixando a interface com uma cópia diferente.
+      const localBefore=clone(db);
       const cloud=await loadCloud();
-      const local=window.db||{config:{},clients:[],products:[],sales:[],expenses:[],payments:[]};
       if(cloud.hasRemoteData){
-        delete cloud.hasRemoteData; window.db=cloud; localStorage.setItem('nunes_bebidas_v1',JSON.stringify(cloud)); if(typeof renderAll==='function')renderAll();
+        delete cloud.hasRemoteData;
+        db=cloud;
+        localStorage.setItem(KEY,JSON.stringify(db));
+        if(typeof renderAll==='function')renderAll();
       }else{
-        delete cloud.hasRemoteData; await saveCloud(local);
+        delete cloud.hasRemoteData;
+        // Só envia dados locais se realmente existirem. Nunca sobrescreve uma nuvem vazia com uma base vazia.
+        const hasLocalData=(db.clients?.length||db.products?.length||db.sales?.length||db.expenses?.length||db.payments?.length);
+        if(hasLocalData){
+          await saveCloud(localBefore);
+        }
       }
       window.firebaseStatus='connected';
       console.log('Nunes Bebidas: Firebase + Firestore + Authentication conectados.',user.email);
