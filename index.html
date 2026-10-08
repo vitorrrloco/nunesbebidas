@@ -68,10 +68,31 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:lin
 .toast{background:#171717;border:1px solid #343434;box-shadow:0 16px 40px rgba(0,0,0,.4)}
 .empty{padding:42px 20px;color:#777}.empty:before{content:"";display:block;width:36px;height:4px;border-radius:99px;background:var(--yellow);margin:0 auto 14px;opacity:.65}
 @media(max-width:720px){.mobilemenu{display:inline-flex;width:42px;height:42px;padding:0;justify-content:center;background:#181818}.mobilemenu svg{color:var(--yellow)}.topbar{height:68px;padding:0 13px}.topbar h1{font-size:18px}.top-actions .iconbtn{width:42px;height:42px;padding:0;justify-content:center}.top-actions .btn.small{padding:10px 12px}.top-actions .btn.small svg{width:17px}.content{padding:18px 14px}.pagehead h2{font-size:27px}.card{padding:17px;border-radius:16px}.stats{gap:11px}.stat{min-height:136px}.stat .value{font-size:24px}.stat .ico{width:36px;height:36px}.quick{gap:9px}.quick .btn{padding:14px 8px}.sidebar{box-shadow:25px 0 70px rgba(0,0,0,.55)}}
+
+/* Firebase Authentication */
+#authScreen{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:22px;background:radial-gradient(circle at 20% 10%,rgba(255,196,0,.12),transparent 35%),#080808;color:#fff}
+.auth-card{width:min(430px,100%);background:#121212;border:1px solid #2a2a2a;border-radius:24px;padding:30px;box-shadow:0 30px 100px rgba(0,0,0,.65)}
+.auth-brand{display:flex;align-items:center;gap:14px;margin-bottom:24px}.auth-logo{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,#ffd21a,#f2a900);color:#111;display:grid;place-items:center;box-shadow:0 10px 30px rgba(255,193,7,.22)}
+.auth-brand b{font-size:20px;letter-spacing:.3px}.auth-brand span{display:block;color:#8f8f8f;font-size:11px;margin-top:3px;letter-spacing:1.4px}
+.auth-title{font-size:28px;font-weight:800;margin:0 0 6px}.auth-sub{color:#999;margin:0 0 22px}.auth-label{font-size:12px;color:#aaa;margin:14px 0 7px;display:block}.auth-input{width:100%;box-sizing:border-box;background:#0c0c0c;border:1px solid #303030;color:#fff;border-radius:12px;padding:14px 15px;outline:none}.auth-input:focus{border-color:#f6c400;box-shadow:0 0 0 3px rgba(246,196,0,.1)}.auth-btn{width:100%;border:0;border-radius:12px;padding:14px;margin-top:18px;background:linear-gradient(135deg,#ffd21a,#f2ae00);color:#111;font-weight:800;cursor:pointer}.auth-links{display:flex;justify-content:space-between;gap:12px;margin-top:14px}.auth-link{background:none;border:0;color:#f5c400;cursor:pointer;padding:4px;font-size:12px}.auth-msg{min-height:20px;margin-top:14px;color:#ffb4b4;font-size:12px}.auth-user{display:flex;align-items:center;gap:10px}.auth-user small{color:#999}.logout-btn{background:#1b1b1b;border:1px solid #303030;color:#fff;border-radius:10px;padding:8px 11px;cursor:pointer}.app.locked{display:none!important}
 </style>
 </head>
 <body>
-<div class="app">
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="auth-brand"><div class="auth-logo"><i data-lucide="beer"></i></div><div><b>NUNES BEBIDAS</b><span>GESTÃO COMERCIAL</span></div></div>
+    <h2 class="auth-title">Entrar no sistema</h2>
+    <p class="auth-sub">Acesse seus clientes, vendas e estoque com segurança.</p>
+    <label class="auth-label">E-mail</label>
+    <input id="authEmail" class="auth-input" type="email" autocomplete="email" placeholder="seu@email.com">
+    <label class="auth-label">Senha</label>
+    <input id="authPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="Sua senha">
+    <button id="authLogin" class="auth-btn">ENTRAR</button>
+    <div class="auth-links"><button class="auth-link" id="authReset">Esqueci minha senha</button><button class="auth-link" id="authRegister">Criar conta</button></div>
+    <div id="authMsg" class="auth-msg"></div>
+  </div>
+</div>
+<div class="app locked">
 <aside class="sidebar" id="sidebar"><div class="brand"><div class="brandmark"><i data-lucide="beer"></i></div><div><b>NUNES BEBIDAS</b><span>GESTÃO COMERCIAL</span></div></div>
 <nav class="nav" id="nav">
 <button class="active" data-view="dashboard"><i data-lucide="layout-dashboard"></i>Dashboard</button>
@@ -83,7 +104,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:lin
 <button data-view="fiado"><i data-lucide="credit-card"></i>Fiado / Cobranças</button>
 <button data-view="relatorios"><i data-lucide="bar-chart-3"></i>Relatórios</button>
 <button data-view="config"><i data-lucide="settings"></i>Configurações</button>
-</nav><div class="sidebottom">Sistema local • Dados salvos neste dispositivo</div></aside>
+</nav><div class="sidebottom">Firebase • Dados sincronizados na nuvem</div></aside>
 <main class="main"><header class="topbar"><div style="display:flex;align-items:center;gap:10px"><button class="iconbtn mobilemenu" id="menu"><i data-lucide="menu"></i></button><h1 id="title">Dashboard</h1></div><div class="top-actions"><button class="btn small" onclick="openSale()"><i data-lucide="plus"></i> Nova venda</button><button class="iconbtn" onclick="go('config')"><i data-lucide="settings"></i></button></div></header>
 <div class="content">
 <section id="dashboard" class="view active"><div class="pagehead"><div><h2>Visão geral</h2><p>Seu balcão de comando para bebidas, caixa e clientes.</p></div></div>
@@ -105,7 +126,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:lin
 
 <section id="relatorios" class="view"><div class="pagehead"><div><h2>Relatórios</h2><p>Indicadores para entender o que está vendendo e onde está o dinheiro.</p></div></div><div class="grid cols2"><div class="card"><b>Resumo comercial</b><div class="tablewrap" id="reportSummary" style="margin-top:12px"></div></div><div class="card"><b>Ranking de produtos</b><div class="tablewrap" id="productRanking" style="margin-top:12px"></div></div></div><div class="card" style="margin-top:16px"><b>Clientes que mais compraram</b><div class="tablewrap" id="clientRanking" style="margin-top:12px"></div></div></section>
 
-<section id="config" class="view"><div class="pagehead"><div><h2>Configurações</h2><p>Personalize o sistema e proteja seus dados.</p></div></div><div class="grid settingsgrid"><div class="card setting"><b>Nome da empresa</b><span class="mini">Aparece no sistema.</span><input class="input" id="cfgName" style="margin-top:10px"><button class="btn primary small" style="margin-top:9px" onclick="saveConfig()">Salvar</button></div><div class="card setting"><b>Mensagem de cobrança</b><span class="mini">Use {nome} e {valor}.</span><textarea class="textarea" id="cfgMsg" rows="4" style="margin-top:10px"></textarea><button class="btn primary small" style="margin-top:9px" onclick="saveConfig()">Salvar</button></div><div class="card setting"><div class="toggle"><div><b>Confirmação de venda</b><span class="mini">Perguntar antes de finalizar.</span></div><div class="switch" id="confirmSwitch" onclick="toggleConfirm()"></div></div></div><div class="card setting"><b>Backup</b><span class="mini">Exporte os dados para um arquivo JSON.</span><button class="btn dark" style="margin-top:12px" onclick="exportData()"><i data-lucide="download"></i>Exportar backup</button><button class="btn" style="margin-top:8px" onclick="document.getElementById('importFile').click()"><i data-lucide="upload"></i>Importar backup</button><input type="file" id="importFile" accept="application/json" hidden onchange="importData(event)"></div><div class="card setting dangerzone"><b>Área de segurança</b><span class="mini">Apaga todos os dados deste navegador.</span><button class="btn danger" style="margin-top:12px" onclick="clearData()"><i data-lucide="trash-2"></i>Apagar tudo</button></div></div><div class="footerhint">NUNES BEBIDAS • Sistema local. Para uso em vários celulares/computadores ao mesmo tempo, a próxima evolução pode usar banco de dados e login.</div></section>
+<section id="config" class="view"><div class="pagehead"><div><h2>Configurações</h2><p>Personalize o sistema e proteja seus dados.</p></div></div><div class="grid settingsgrid"><div class="card setting"><b>Nome da empresa</b><span class="mini">Aparece no sistema.</span><input class="input" id="cfgName" style="margin-top:10px"><button class="btn primary small" style="margin-top:9px" onclick="saveConfig()">Salvar</button></div><div class="card setting"><b>Mensagem de cobrança</b><span class="mini">Use {nome} e {valor}.</span><textarea class="textarea" id="cfgMsg" rows="4" style="margin-top:10px"></textarea><button class="btn primary small" style="margin-top:9px" onclick="saveConfig()">Salvar</button></div><div class="card setting"><div class="toggle"><div><b>Confirmação de venda</b><span class="mini">Perguntar antes de finalizar.</span></div><div class="switch" id="confirmSwitch" onclick="toggleConfirm()"></div></div></div><div class="card setting"><b>Backup</b><span class="mini">Exporte os dados para um arquivo JSON.</span><button class="btn dark" style="margin-top:12px" onclick="exportData()"><i data-lucide="download"></i>Exportar backup</button><button class="btn" style="margin-top:8px" onclick="document.getElementById('importFile').click()"><i data-lucide="upload"></i>Importar backup</button><input type="file" id="importFile" accept="application/json" hidden onchange="importData(event)"></div><div class="card setting dangerzone"><b>Área de segurança</b><span class="mini">Apaga todos os dados deste navegador.</span><button class="btn danger" style="margin-top:12px" onclick="clearData()"><i data-lucide="trash-2"></i>Apagar tudo</button></div></div><div class="footerhint">NUNES BEBIDAS • Firebase conectado • Dados sincronizados na nuvem.</div></section>
 </div></main></div>
 
 <div class="modal" id="modal"><div class="modalbox" id="modalbox"></div></div><div class="toast" id="toast"></div>
@@ -169,7 +190,13 @@ seed();renderAll();
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
-  import { getFirestore, collection, doc, getDocs, writeBatch, setDoc, deleteDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
+  import {
+    getFirestore, collection, doc, getDocs, writeBatch, getDoc, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
+  import {
+    getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+    createUserWithEmailAndPassword, sendPasswordResetEmail, signOut
+  } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAG_CmStbLvZ9Bv2HBOGx6IaavAd-YDqc4",
@@ -183,29 +210,47 @@ seed();renderAll();
 
   const app = initializeApp(firebaseConfig);
   const firestore = getFirestore(app);
+  const auth = getAuth(app);
   const collections = ['clients','products','sales','expenses','payments'];
+  const authScreen=document.getElementById('authScreen');
+  const appRoot=document.querySelector('.app');
+  const msg=document.getElementById('authMsg');
+  const emailEl=document.getElementById('authEmail');
+  const passEl=document.getElementById('authPassword');
+  const setMsg=(t,ok=false)=>{msg.textContent=t;msg.style.color=ok?'#b9e769':'#ffb4b4'};
+  const friendly=(e)=>{
+    const c=e?.code||'';
+    const map={
+      'auth/invalid-credential':'E-mail ou senha incorretos.',
+      'auth/invalid-email':'Digite um e-mail válido.',
+      'auth/email-already-in-use':'Este e-mail já possui uma conta.',
+      'auth/weak-password':'A senha precisa ter pelo menos 6 caracteres.',
+      'auth/too-many-requests':'Muitas tentativas. Aguarde um pouco e tente novamente.',
+      'auth/network-request-failed':'Falha de conexão. Verifique a internet.'
+    };
+    return map[c]||'Não foi possível concluir. Confira os dados e tente novamente.';
+  };
 
   async function loadCollection(name){
-    const snap = await getDocs(collection(firestore,name));
-    return snap.docs.map(d => ({id:d.id, ...d.data()}));
+    const snap=await getDocs(collection(firestore,name));
+    return snap.docs.map(d=>({id:d.id,...d.data()}));
   }
 
   async function loadCloud(){
-    const [clients, products, sales, expenses, payments] = await Promise.all(collections.map(loadCollection));
-    const cfgSnap = await getDoc(doc(firestore,'config','empresa'));
-    const current = window.db || {};
+    const [clients,products,sales,expenses,payments]=await Promise.all(collections.map(loadCollection));
+    const cfgSnap=await getDoc(doc(firestore,'config','empresa'));
+    const current=window.db||{};
     return {
-      config: cfgSnap.exists() ? {...(current.config||{}), ...cfgSnap.data()} : (current.config||{}),
-      clients, products, sales, expenses, payments,
-      hasRemoteData: cfgSnap.exists() || clients.length || products.length || sales.length || expenses.length || payments.length
+      config:cfgSnap.exists()?{...(current.config||{}),...cfgSnap.data()}:(current.config||{}),
+      clients,products,sales,expenses,payments,
+      hasRemoteData:cfgSnap.exists()||clients.length||products.length||sales.length||expenses.length||payments.length
     };
   }
 
   async function commitOps(ops){
-    const chunk=400;
-    for(let i=0;i<ops.length;i+=chunk){
+    for(let i=0;i<ops.length;i+=400){
       const batch=writeBatch(firestore);
-      ops.slice(i,i+chunk).forEach(op=>{
+      ops.slice(i,i+400).forEach(op=>{
         const ref=doc(firestore,op.col,op.id);
         if(op.delete) batch.delete(ref); else batch.set(ref,op.data,{merge:false});
       });
@@ -214,6 +259,7 @@ seed();renderAll();
   }
 
   async function saveCloud(data){
+    if(!auth.currentUser) throw new Error('Usuário não autenticado.');
     const ops=[];
     for(const name of collections){
       const snap=await getDocs(collection(firestore,name));
@@ -224,26 +270,50 @@ seed();renderAll();
     await commitOps(ops);
   }
 
-  window.firebaseCloud = {load:loadCloud, save:saveCloud, app, firestore};
+  window.firebaseCloud={load:loadCloud,save:saveCloud,app,firestore,auth};
 
-  try {
-    const cloud = await loadCloud();
-    const local = window.db || {config:{},clients:[],products:[],sales:[],expenses:[],payments:[]};
-    if(cloud.hasRemoteData){
-      delete cloud.hasRemoteData;
-      window.db = cloud;
-      localStorage.setItem('nunes_bebidas_v1', JSON.stringify(cloud));
-      if(typeof renderAll === 'function') renderAll();
-    } else {
-      delete cloud.hasRemoteData;
-      await saveCloud(local);
-      console.log('Nunes Bebidas: dados locais enviados ao Firestore.');
+  document.getElementById('authLogin').onclick=async()=>{
+    const email=emailEl.value.trim(), password=passEl.value;
+    if(!email||!password) return setMsg('Informe e-mail e senha.');
+    setMsg('Entrando...',true);
+    try{await signInWithEmailAndPassword(auth,email,password)}catch(e){setMsg(friendly(e))}
+  };
+  document.getElementById('authRegister').onclick=async()=>{
+    const email=emailEl.value.trim(), password=passEl.value;
+    if(!email||!password) return setMsg('Informe e-mail e uma senha com pelo menos 6 caracteres.');
+    setMsg('Criando sua conta...',true);
+    try{await createUserWithEmailAndPassword(auth,email,password)}catch(e){setMsg(friendly(e))}
+  };
+  document.getElementById('authReset').onclick=async()=>{
+    const email=emailEl.value.trim();
+    if(!email) return setMsg('Digite seu e-mail para receber o link de recuperação.');
+    try{await sendPasswordResetEmail(auth,email);setMsg('Link de recuperação enviado para seu e-mail.',true)}catch(e){setMsg(friendly(e))}
+  };
+  passEl.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('authLogin').click()});
+
+  onAuthStateChanged(auth,async(user)=>{
+    if(!user){
+      authScreen.style.display='flex'; appRoot.classList.add('locked'); window.firebaseStatus='signed-out'; return;
     }
-    window.firebaseStatus = 'connected';
-    console.log('Nunes Bebidas: Firestore conectado.');
-  } catch (error) {
-    window.firebaseStatus = 'error';
-    console.error('Nunes Bebidas: erro ao carregar Firestore', error);
-  }
+    authScreen.style.display='none'; appRoot.classList.remove('locked');
+    window.firebaseUser=user;
+    try{
+      const cloud=await loadCloud();
+      const local=window.db||{config:{},clients:[],products:[],sales:[],expenses:[],payments:[]};
+      if(cloud.hasRemoteData){
+        delete cloud.hasRemoteData; window.db=cloud; localStorage.setItem('nunes_bebidas_v1',JSON.stringify(cloud)); if(typeof renderAll==='function')renderAll();
+      }else{
+        delete cloud.hasRemoteData; await saveCloud(local);
+      }
+      window.firebaseStatus='connected';
+      console.log('Nunes Bebidas: Firebase + Firestore + Authentication conectados.',user.email);
+    }catch(error){
+      window.firebaseStatus='error'; console.error(error);
+      if(typeof toast==='function')toast('Login OK, mas o Firestore recusou o acesso. Verifique as Rules.');
+    }
+  });
+
+  // Logout acessível pelo console até adicionarmos o botão visual de usuário.
+  window.logoutNunes=()=>signOut(auth);
 </script>
 </body></html>
