@@ -147,7 +147,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:lin
 <button data-view="relatorios"><i data-lucide="bar-chart-3"></i>Relatórios</button>
 <button data-view="config"><i data-lucide="settings"></i>Configurações</button>
 </nav><div class="sidebottom">Firebase • Dados sincronizados na nuvem</div></aside>
-<main class="main"><header class="topbar"><div style="display:flex;align-items:center;gap:10px"><button class="iconbtn mobilemenu" id="menu"><i data-lucide="menu"></i></button><h1 id="title">Dashboard</h1></div><div class="top-actions"><button class="btn small" onclick="openSale()"><i data-lucide="plus"></i> Nova venda</button><button class="iconbtn" onclick="go('config')"><i data-lucide="settings"></i></button></div></header>
+<main class="main"><header class="topbar"><div style="display:flex;align-items:center;gap:10px"><button class="iconbtn mobilemenu" id="menu"><i data-lucide="menu"></i></button><h1 id="title">Dashboard</h1></div><div id="firebaseStatus" style="font-size:11px;font-weight:800;color:#777;margin-right:8px">☁️ sincronizando...</div><div class="top-actions"><button class="btn small" onclick="openSale()"><i data-lucide="plus"></i> Nova venda</button><button class="iconbtn" onclick="go('config')"><i data-lucide="settings"></i></button></div></header>
 <div class="content">
 <section id="dashboard" class="view active"><div class="pagehead"><div><h2>Visão geral</h2><p>Seu balcão de comando para bebidas, caixa e clientes.</p></div></div>
 <div class="grid stats"><div class="card stat"><span class="label">Vendas hoje</span><div class="value" id="kToday">R$ 0,00</div><div class="sub" id="kTodaySub">0 pedidos</div><div class="ico"><i data-lucide="trending-up"></i></div></div><div class="card stat"><span class="label">A receber</span><div class="value" id="kReceivable">R$ 0,00</div><div class="sub">clientes em aberto</div><div class="ico"><i data-lucide="clock-3"></i></div></div><div class="card stat"><span class="label">Estoque baixo</span><div class="value" id="kLow">0</div><div class="sub">produtos precisam atenção</div><div class="ico"><i data-lucide="triangle-alert"></i></div></div><div class="card stat"><span class="label">Lucro estimado</span><div class="value" id="kProfit">R$ 0,00</div><div class="sub">vendas pagas − custo</div><div class="ico"><i data-lucide="badge-dollar-sign"></i></div></div></div>
@@ -247,7 +247,7 @@ seed();renderAll();
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
   import {
-    getFirestore, collection, doc, getDocs, writeBatch, getDoc, serverTimestamp, onSnapshot, deleteDoc
+    getFirestore, collection, doc, getDocs, writeBatch, getDoc, serverTimestamp, onSnapshot
   } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
   import {
     getAuth, onAuthStateChanged, signInWithEmailAndPassword,
@@ -287,45 +287,50 @@ seed();renderAll();
     return map[c]||'Não foi possível concluir. Confira os dados e tente novamente.';
   };
 
-  const sync = {
-    shadow: {clients:[],products:[],sales:[],expenses:[],payments:[],config:{}},
-    unsub: [],
-    ready: false,
-    saving: false,
-    queued: false
-  };
+  const sync={shadow:{clients:[],products:[],sales:[],expenses:[],payments:[],config:{}},unsub:[],ready:false,saving:false,queued:false,uid:null};
+  const clone=v=>JSON.parse(JSON.stringify(v ?? null));
+  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const userCol=(name)=>collection(firestore,'businesses',sync.uid,name);
+  const userDoc=(name,id)=>doc(firestore,'businesses',sync.uid,name,id);
+  const userConfig=()=>doc(firestore,'businesses',sync.uid,'config','empresa');
 
-  const cols = ['clients','products','sales','expenses','payments'];
-  const clone = v => JSON.parse(JSON.stringify(v ?? null));
-  const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+  function hasData(x){return !!(x && (x.clients?.length||x.products?.length||x.sales?.length||x.expenses?.length||x.payments?.length));}
+  function stopListeners(){sync.unsub.forEach(fn=>{try{fn()}catch{}});sync.unsub=[];}
 
-  async function readRemote() {
+  async function readUserRemote(){
     const out={clients:[],products:[],sales:[],expenses:[],payments:[],config:{}};
-    const snaps=await Promise.all(cols.map(name=>getDocs(collection(firestore,name))));
-    snaps.forEach((snap,i)=>out[cols[i]]=snap.docs.map(d=>({id:d.id,...d.data()})));
-    const cfg=await getDoc(doc(firestore,'config','empresa'));
-    if(cfg.exists()) out.config=cfg.data();
-    out.hasRemoteData=Object.values(out).some(v=>Array.isArray(v)?v.length:Object.keys(v||{}).length);
+    const snaps=await Promise.all(collections.map(n=>getDocs(userCol(n))));
+    snaps.forEach((snap,i)=>out[collections[i]]=snap.docs.map(d=>({id:d.id,...d.data()})));
+    const cfg=await getDoc(userConfig());
+    if(cfg.exists())out.config=cfg.data();
+    out.hasData=hasData(out)||Object.keys(out.config||{}).length>0;
     return out;
   }
 
-  async function writeInitial(data){
+  // Compatibilidade: aproveita a base antiga que estava nas coleções globais.
+  async function readLegacyRemote(){
+    const out={clients:[],products:[],sales:[],expenses:[],payments:[]};
+    const snaps=await Promise.all(collections.map(n=>getDocs(collection(firestore,n))));
+    snaps.forEach((snap,i)=>out[collections[i]]=snap.docs.map(d=>({id:d.id,...d.data()})));
+    out.hasData=hasData(out);
+    return out;
+  }
+
+  async function writeToUser(data){
     const ops=[];
-    for(const name of cols){
+    for(const name of collections){
       for(const item of (data[name]||[])){
-        const id=item.id||crypto.randomUUID();
-        ops.push({col:name,id,data:{...item,id}});
+        const id=String(item.id||crypto.randomUUID());
+        ops.push({ref:userDoc(name,id),data:{...item,id}});
       }
     }
-    ops.push({col:'config',id:'empresa',data:{...(data.config||{}),updatedAt:serverTimestamp()}});
+    if(data.config)ops.push({ref:userConfig(),data:{...data.config,updatedAt:serverTimestamp()}});
     for(let i=0;i<ops.length;i+=400){
       const batch=writeBatch(firestore);
-      ops.slice(i,i+400).forEach(op=>batch.set(doc(firestore,op.col,op.id),op.data,{merge:false}));
+      ops.slice(i,i+400).forEach(op=>batch.set(op.ref,op.data,{merge:false}));
       await batch.commit();
     }
   }
-
-  function stopListeners(){sync.unsub.forEach(fn=>{try{fn()}catch{}});sync.unsub=[];}
 
   function applyRemoteCollection(name,docs){
     if(!sync.ready)return;
@@ -337,15 +342,14 @@ seed();renderAll();
 
   function startListeners(){
     stopListeners();
-    cols.forEach(name=>{
-      const unsub=onSnapshot(collection(firestore,name),snap=>{
-        const docs=snap.docs.map(d=>({id:d.id,...d.data()}));
-        applyRemoteCollection(name,docs);
-      },err=>console.error('Firestore listener',name,err));
+    collections.forEach(name=>{
+      const unsub=onSnapshot(userCol(name),snap=>{
+        applyRemoteCollection(name,snap.docs.map(d=>({id:d.id,...d.data()})));
+      },err=>{console.error('Firestore listener',name,err);if(typeof toast==='function')toast('Erro de sincronização em '+name);});
       sync.unsub.push(unsub);
     });
-    sync.unsub.push(onSnapshot(doc(firestore,'config','empresa'),snap=>{
-      if(!sync.ready || !snap.exists())return;
+    sync.unsub.push(onSnapshot(userConfig(),snap=>{
+      if(!sync.ready||!snap.exists())return;
       db.config={...(db.config||{}),...snap.data()};
       sync.shadow.config=clone(db.config);
       localStorage.setItem(KEY,JSON.stringify(db));
@@ -354,17 +358,29 @@ seed();renderAll();
   }
 
   async function loadCloud(){
-    const remote=await readRemote();
-    if(remote.hasRemoteData){
-      delete remote.hasRemoteData;
-      db={
-        config:{...(db.config||{}),...(remote.config||{})},
-        clients:remote.clients,products:remote.products,sales:remote.sales,
-        expenses:remote.expenses,payments:remote.payments
-      };
+    const remote=await readUserRemote();
+    let source=null;
+    if(remote.hasData){
+      source=remote;
     }else{
-      await writeInitial(db);
+      // Primeiro tenta recuperar automaticamente a base antiga.
+      let legacy={hasData:false};
+      try{legacy=await readLegacyRemote()}catch(e){console.warn('Legacy read unavailable',e)}
+      if(legacy.hasData){
+        source={...legacy,config:db.config||{}};
+        await writeToUser(source);
+        toast('Dados antigos recuperados e migrados para sua conta.');
+      }else if(hasData(db)){
+        // Só envia a base local quando a nuvem do usuário está realmente vazia.
+        source=clone(db);
+        await writeToUser(source);
+        toast('Dados deste aparelho enviados para o Firebase.');
+      }else{
+        source={config:db.config||{},clients:[],products:[],sales:[],expenses:[],payments:[]};
+        await writeToUser(source);
+      }
     }
+    db={config:{...(db.config||{}),...(source.config||{})},clients:source.clients||[],products:source.products||[],sales:source.sales||[],expenses:source.expenses||[],payments:source.payments||[]};
     sync.shadow=clone(db);
     sync.ready=true;
     localStorage.setItem(KEY,JSON.stringify(db));
@@ -374,34 +390,29 @@ seed();renderAll();
   }
 
   async function saveCloud(data){
-    if(!auth.currentUser) throw new Error('Usuário não autenticado.');
-    if(!sync.ready){ await loadCloud(); return; }
-    if(sync.saving){ sync.queued=true; return; }
+    if(!auth.currentUser)throw new Error('Usuário não autenticado.');
+    if(!sync.ready){await loadCloud();return;}
+    if(sync.saving){sync.queued=true;return;}
     sync.saving=true;
     try{
-      for(const name of cols){
+      for(const name of collections){
         const before=sync.shadow[name]||[];
         const after=data[name]||[];
         const bm=new Map(before.map(x=>[String(x.id),x]));
         const am=new Map(after.map(x=>[String(x.id),x]));
-        const batch=writeBatch(firestore);
-        let count=0;
-        for(const item of after){
-          const id=String(item.id||crypto.randomUUID());
-          if(!item.id)item.id=id;
-          if(!bm.has(id) || !same(bm.get(id),item)){
-            batch.set(doc(firestore,name,id),{...item,id},{merge:false}); count++;
-          }
+        const batch=writeBatch(firestore);let count=0;
+        for(const item0 of after){
+          const item={...item0};
+          const id=String(item.id||crypto.randomUUID());item.id=id;
+          if(!bm.has(id)||!same(bm.get(id),item)){batch.set(userDoc(name,id),item,{merge:false});count++;}
         }
         for(const old of before){
-          const id=String(old.id);
-          if(!am.has(id)){ batch.delete(doc(firestore,name,id)); count++; }
+          const id=String(old.id);if(!am.has(id)){batch.delete(userDoc(name,id));count++;}
         }
-        if(count) await batch.commit();
+        if(count)await batch.commit();
       }
-      // Configuração é um documento separado. Escrevemos somente quando mudou.
       if(!same(sync.shadow.config,data.config||{})){
-        await (async()=>{const b=writeBatch(firestore);b.set(doc(firestore,'config','empresa'),{...(data.config||{}),updatedAt:serverTimestamp()},{merge:false});await b.commit()})();
+        const b=writeBatch(firestore);b.set(userConfig(),{...(data.config||{}),updatedAt:serverTimestamp()},{merge:false});await b.commit();
       }
       sync.shadow=clone(data);
     }finally{
@@ -411,59 +422,27 @@ seed();renderAll();
   }
 
   window.firebaseCloud={load:loadCloud,save:saveCloud,app,firestore,auth};
+  window.logoutNunes=()=>signOut(auth);
 
   document.getElementById('authLogin').onclick=async()=>{
-    const email=emailEl.value.trim(), password=passEl.value;
-    if(!email||!password) return setMsg('Informe e-mail e senha.');
-    setMsg('Entrando...',true);
-    try{await signInWithEmailAndPassword(auth,email,password)}catch(e){setMsg(friendly(e))}
+    const email=emailEl.value.trim(),password=passEl.value;if(!email||!password)return setMsg('Informe e-mail e senha.');
+    setMsg('Entrando...',true);try{await signInWithEmailAndPassword(auth,email,password)}catch(e){setMsg(friendly(e))}
   };
   document.getElementById('authRegister').onclick=async()=>{
-    const email=emailEl.value.trim(), password=passEl.value;
-    if(!email||!password) return setMsg('Informe e-mail e uma senha com pelo menos 6 caracteres.');
-    setMsg('Criando sua conta...',true);
-    try{await createUserWithEmailAndPassword(auth,email,password)}catch(e){setMsg(friendly(e))}
+    const email=emailEl.value.trim(),password=passEl.value;if(!email||!password)return setMsg('Informe e-mail e uma senha com pelo menos 6 caracteres.');
+    setMsg('Criando sua conta...',true);try{await createUserWithEmailAndPassword(auth,email,password)}catch(e){setMsg(friendly(e))}
   };
   document.getElementById('authReset').onclick=async()=>{
-    const email=emailEl.value.trim();
-    if(!email) return setMsg('Digite seu e-mail para receber o link de recuperação.');
+    const email=emailEl.value.trim();if(!email)return setMsg('Digite seu e-mail para receber o link de recuperação.');
     try{await sendPasswordResetEmail(auth,email);setMsg('Link de recuperação enviado para seu e-mail.',true)}catch(e){setMsg(friendly(e))}
   };
   passEl.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('authLogin').click()});
 
-  onAuthStateChanged(auth,async(user)=>{
-    if(!user){
-      authScreen.style.display='flex'; appRoot.classList.add('locked'); window.firebaseStatus='signed-out'; return;
-    }
-    authScreen.style.display='none'; appRoot.classList.remove('locked');
-    window.firebaseUser=user;
-    try{
-      // IMPORTANTE: use a mesma variável `db` da interface.
-      // A versão anterior escrevia em window.db, deixando a interface com uma cópia diferente.
-      const localBefore=clone(db);
-      const cloud=await loadCloud();
-      if(cloud.hasRemoteData){
-        delete cloud.hasRemoteData;
-        db=cloud;
-        localStorage.setItem(KEY,JSON.stringify(db));
-        if(typeof renderAll==='function')renderAll();
-      }else{
-        delete cloud.hasRemoteData;
-        // Só envia dados locais se realmente existirem. Nunca sobrescreve uma nuvem vazia com uma base vazia.
-        const hasLocalData=(db.clients?.length||db.products?.length||db.sales?.length||db.expenses?.length||db.payments?.length);
-        if(hasLocalData){
-          await saveCloud(localBefore);
-        }
-      }
-      window.firebaseStatus='connected';
-      console.log('Nunes Bebidas: Firebase + Firestore + Authentication conectados.',user.email);
-    }catch(error){
-      window.firebaseStatus='error'; console.error(error);
-      if(typeof toast==='function')toast('Login OK, mas o Firestore recusou o acesso. Verifique as Rules.');
-    }
+  onAuthStateChanged(auth,async user=>{
+    if(!user){stopListeners();sync.ready=false;authScreen.style.display='flex';appRoot.classList.add('locked');const el=document.getElementById('firebaseStatus');if(el){el.textContent='🔒 não conectado';el.style.color='#777'}return;}
+    authScreen.style.display='none';appRoot.classList.remove('locked');window.firebaseUser=user;sync.uid=user.uid;
+    try{await loadCloud();window.firebaseStatus='connected';const el=document.getElementById('firebaseStatus');if(el){el.textContent='☁️ Firebase conectado';el.style.color='#6aa400'}console.log('Nunes Bebidas sincronizado com Firebase:',user.email,user.uid)}
+    catch(error){window.firebaseStatus='error';const el=document.getElementById('firebaseStatus');if(el){el.textContent='⚠️ Firebase sem acesso';el.style.color='#c33'}console.error(error);if(typeof toast==='function')toast('Login OK, mas não foi possível sincronizar com o Firebase. Confira as Rules.');}
   });
-
-  // Logout acessível pelo console até adicionarmos o botão visual de usuário.
-  window.logoutNunes=()=>signOut(auth);
 </script>
 </body></html>
