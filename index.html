@@ -247,7 +247,7 @@ seed();renderAll();
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
   import {
-    getFirestore, collection, doc, getDocs, writeBatch, getDoc, serverTimestamp
+    getFirestore, collection, doc, getDocs, writeBatch, getDoc, serverTimestamp, onSnapshot, deleteDoc
   } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
   import {
     getAuth, onAuthStateChanged, signInWithEmailAndPassword,
@@ -287,43 +287,127 @@ seed();renderAll();
     return map[c]||'Não foi possível concluir. Confira os dados e tente novamente.';
   };
 
-  async function loadCollection(name){
-    const snap=await getDocs(collection(firestore,name));
-    return snap.docs.map(d=>({id:d.id,...d.data()}));
+  const sync = {
+    shadow: {clients:[],products:[],sales:[],expenses:[],payments:[],config:{}},
+    unsub: [],
+    ready: false,
+    saving: false,
+    queued: false
+  };
+
+  const cols = ['clients','products','sales','expenses','payments'];
+  const clone = v => JSON.parse(JSON.stringify(v ?? null));
+  const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+
+  async function readRemote() {
+    const out={clients:[],products:[],sales:[],expenses:[],payments:[],config:{}};
+    const snaps=await Promise.all(cols.map(name=>getDocs(collection(firestore,name))));
+    snaps.forEach((snap,i)=>out[cols[i]]=snap.docs.map(d=>({id:d.id,...d.data()})));
+    const cfg=await getDoc(doc(firestore,'config','empresa'));
+    if(cfg.exists()) out.config=cfg.data();
+    out.hasRemoteData=Object.values(out).some(v=>Array.isArray(v)?v.length:Object.keys(v||{}).length);
+    return out;
   }
 
-  async function loadCloud(){
-    const [clients,products,sales,expenses,payments]=await Promise.all(collections.map(loadCollection));
-    const cfgSnap=await getDoc(doc(firestore,'config','empresa'));
-    const current=window.db||{};
-    return {
-      config:cfgSnap.exists()?{...(current.config||{}),...cfgSnap.data()}:(current.config||{}),
-      clients,products,sales,expenses,payments,
-      hasRemoteData:cfgSnap.exists()||clients.length||products.length||sales.length||expenses.length||payments.length
-    };
-  }
-
-  async function commitOps(ops){
+  async function writeInitial(data){
+    const ops=[];
+    for(const name of cols){
+      for(const item of (data[name]||[])){
+        const id=item.id||crypto.randomUUID();
+        ops.push({col:name,id,data:{...item,id}});
+      }
+    }
+    ops.push({col:'config',id:'empresa',data:{...(data.config||{}),updatedAt:serverTimestamp()}});
     for(let i=0;i<ops.length;i+=400){
       const batch=writeBatch(firestore);
-      ops.slice(i,i+400).forEach(op=>{
-        const ref=doc(firestore,op.col,op.id);
-        if(op.delete) batch.delete(ref); else batch.set(ref,op.data,{merge:false});
-      });
+      ops.slice(i,i+400).forEach(op=>batch.set(doc(firestore,op.col,op.id),op.data,{merge:false}));
       await batch.commit();
     }
   }
 
+  function stopListeners(){sync.unsub.forEach(fn=>{try{fn()}catch{}});sync.unsub=[];}
+
+  function applyRemoteCollection(name,docs){
+    if(!sync.ready)return;
+    db[name]=docs.map(d=>clone(d));
+    sync.shadow[name]=clone(db[name]);
+    localStorage.setItem(KEY,JSON.stringify(db));
+    renderAll();
+  }
+
+  function startListeners(){
+    stopListeners();
+    cols.forEach(name=>{
+      const unsub=onSnapshot(collection(firestore,name),snap=>{
+        const docs=snap.docs.map(d=>({id:d.id,...d.data()}));
+        applyRemoteCollection(name,docs);
+      },err=>console.error('Firestore listener',name,err));
+      sync.unsub.push(unsub);
+    });
+    sync.unsub.push(onSnapshot(doc(firestore,'config','empresa'),snap=>{
+      if(!sync.ready || !snap.exists())return;
+      db.config={...(db.config||{}),...snap.data()};
+      sync.shadow.config=clone(db.config);
+      localStorage.setItem(KEY,JSON.stringify(db));
+      renderAll();
+    },err=>console.error('Firestore listener config',err)));
+  }
+
+  async function loadCloud(){
+    const remote=await readRemote();
+    if(remote.hasRemoteData){
+      delete remote.hasRemoteData;
+      db={
+        config:{...(db.config||{}),...(remote.config||{})},
+        clients:remote.clients,products:remote.products,sales:remote.sales,
+        expenses:remote.expenses,payments:remote.payments
+      };
+    }else{
+      await writeInitial(db);
+    }
+    sync.shadow=clone(db);
+    sync.ready=true;
+    localStorage.setItem(KEY,JSON.stringify(db));
+    startListeners();
+    renderAll();
+    return db;
+  }
+
   async function saveCloud(data){
     if(!auth.currentUser) throw new Error('Usuário não autenticado.');
-    const ops=[];
-    for(const name of collections){
-      const snap=await getDocs(collection(firestore,name));
-      snap.docs.forEach(d=>ops.push({col:name,id:d.id,delete:true}));
-      for(const item of (data[name]||[])) ops.push({col:name,id:item.id||crypto.randomUUID(),data:item});
+    if(!sync.ready){ await loadCloud(); return; }
+    if(sync.saving){ sync.queued=true; return; }
+    sync.saving=true;
+    try{
+      for(const name of cols){
+        const before=sync.shadow[name]||[];
+        const after=data[name]||[];
+        const bm=new Map(before.map(x=>[String(x.id),x]));
+        const am=new Map(after.map(x=>[String(x.id),x]));
+        const batch=writeBatch(firestore);
+        let count=0;
+        for(const item of after){
+          const id=String(item.id||crypto.randomUUID());
+          if(!item.id)item.id=id;
+          if(!bm.has(id) || !same(bm.get(id),item)){
+            batch.set(doc(firestore,name,id),{...item,id},{merge:false}); count++;
+          }
+        }
+        for(const old of before){
+          const id=String(old.id);
+          if(!am.has(id)){ batch.delete(doc(firestore,name,id)); count++; }
+        }
+        if(count) await batch.commit();
+      }
+      // Configuração é um documento separado. Escrevemos somente quando mudou.
+      if(!same(sync.shadow.config,data.config||{})){
+        await (async()=>{const b=writeBatch(firestore);b.set(doc(firestore,'config','empresa'),{...(data.config||{}),updatedAt:serverTimestamp()},{merge:false});await b.commit()})();
+      }
+      sync.shadow=clone(data);
+    }finally{
+      sync.saving=false;
+      if(sync.queued){sync.queued=false;queueMicrotask(()=>saveCloud(db).catch(console.error));}
     }
-    ops.push({col:'config',id:'empresa',data:{...(data.config||{}),updatedAt:serverTimestamp()}});
-    await commitOps(ops);
   }
 
   window.firebaseCloud={load:loadCloud,save:saveCloud,app,firestore,auth};
