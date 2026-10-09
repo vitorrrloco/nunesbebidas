@@ -118,6 +118,18 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:lin
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:720px){.quick-sale-modal{width:100%;max-height:94vh;border-radius:20px}.quick-line{grid-template-columns:minmax(0,1fr) 82px 96px 38px}.price-box{padding:0 8px}.quick-sale-modal .modalfoot{position:sticky;bottom:0;background:#171717}.quick-sale-modal .modalfoot .btn.primary{flex:1}}
 </style>
+<style id="nunes-v1-usability">
+/* Ajustes de usabilidade V1.0 */
+.stat .label,.stat .value,.stat .sub{position:relative;z-index:1;max-width:calc(100% - 54px);overflow-wrap:anywhere}
+.stat .label{display:block;line-height:1.45;padding-right:2px}
+.stat .ico{z-index:2;right:14px;top:14px;pointer-events:none}
+.topbar{gap:10px}.topbar>div:first-child{min-width:0;flex:1}.topbar h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.top-actions{flex:0 0 auto}.refresh-btn{padding:7px 9px;gap:5px;font-size:11px;min-height:34px;color:#ddd}.refresh-btn svg{width:14px;height:14px}.settings-btn{min-width:40px;justify-content:center}
+#firebaseStatus{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:50%;transform:translate(-50%,-12px);z-index:100001;display:block;max-width:calc(100vw - 32px);padding:11px 16px;border:1px solid #333;border-radius:13px;background:#171717;color:#fff!important;font-size:12px;font-weight:750;box-shadow:0 15px 45px #0008;opacity:0;visibility:hidden;transition:opacity .22s,transform .22s,visibility .22s;pointer-events:none;text-align:center}
+#firebaseStatus.show{opacity:1;visibility:visible;transform:translate(-50%,0)}
+#loadingScreen{position:fixed;inset:0;z-index:100000;display:none;align-items:center;justify-content:center;flex-direction:column;gap:15px;background:radial-gradient(circle at 50% 35%,#222 0,#0a0a0a 48%);color:#fff;text-align:center;padding:24px}
+#loadingScreen.show{display:flex}.loading-logo{width:66px;height:66px;border-radius:20px;background:linear-gradient(135deg,#ffe34d,#f5b800);color:#111;display:grid;place-items:center;box-shadow:0 10px 35px #ffc40030}.loading-logo svg{width:30px;height:30px}.loading-spinner{width:30px;height:30px;border:3px solid #393939;border-top-color:#ffd21a;border-radius:50%;animation:nunesSpin .8s linear infinite}.loading-title{font-weight:850;font-size:18px}.loading-copy{font-size:12px;color:#999;max-width:260px;line-height:1.5}@keyframes nunesSpin{to{transform:rotate(360deg)}}
+@media(max-width:720px){.topbar{gap:7px;padding:0 10px}.topbar h1{font-size:16px}.top-actions{gap:6px}.refresh-btn{width:34px;height:34px;min-width:34px;padding:0;justify-content:center}.refresh-btn span{display:none}.top-actions .btn.small{padding:9px 10px;font-size:11px;gap:5px}.top-actions .btn.small svg{width:15px;height:15px}.settings-btn{width:36px;height:36px;padding:0}.stat .label{font-size:10px;letter-spacing:.07em}.stat .value{font-size:23px}.stat .ico{width:34px;height:34px;right:11px;top:12px}.stat .label,.stat .value,.stat .sub{max-width:calc(100% - 42px)}}
+</style>
 </head>
 <body>
 <div id="authScreen">
@@ -134,6 +146,8 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:lin
     <div id="authMsg" class="auth-msg"></div>
   </div>
 </div>
+<div id="loadingScreen" role="status" aria-live="polite"><div class="loading-logo"><i data-lucide="beer"></i></div><div class="loading-spinner"></div><div class="loading-title">Preparando seu sistema</div><div class="loading-copy">Conectando ao Firebase e carregando seus dados com segurança...</div></div>
+<div id="firebaseStatus" role="status" aria-live="polite">☁️ Firebase conectado</div>
 <div class="app locked">
 <aside class="sidebar" id="sidebar"><div class="brand"><div class="brandmark"><i data-lucide="beer"></i></div><div><b>NUNES BEBIDAS</b><span>GESTÃO COMERCIAL</span></div></div>
 <nav class="nav" id="nav">
@@ -147,7 +161,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:lin
 <button data-view="relatorios"><i data-lucide="bar-chart-3"></i>Relatórios</button>
 <button data-view="config"><i data-lucide="settings"></i>Configurações</button>
 </nav><div class="sidebottom">Firebase • Dados sincronizados na nuvem</div></aside>
-<main class="main"><header class="topbar"><div style="display:flex;align-items:center;gap:10px"><button class="iconbtn mobilemenu" id="menu"><i data-lucide="menu"></i></button><h1 id="title">Dashboard</h1></div><div id="firebaseStatus" style="font-size:11px;font-weight:800;color:#777;margin-right:8px">☁️ sincronizando...</div><div class="top-actions"><button class="btn small" onclick="openSale()"><i data-lucide="plus"></i> Nova venda</button><button class="iconbtn" onclick="go('config')"><i data-lucide="settings"></i></button></div></header>
+<main class="main"><header class="topbar"><div style="display:flex;align-items:center;gap:10px"><button class="iconbtn mobilemenu" id="menu"><i data-lucide="menu"></i></button><h1 id="title">Dashboard</h1></div><div class="top-actions"><button class="iconbtn refresh-btn" id="refreshPage" onclick="refreshApp()" title="Atualizar sistema" aria-label="Atualizar sistema"><i data-lucide="refresh-cw"></i><span>Atualizar</span></button><button class="btn small" onclick="openSale()"><i data-lucide="plus"></i> Nova venda</button><button class="iconbtn settings-btn" onclick="go('config')" title="Configurações"><i data-lucide="settings"></i></button></div></header>
 <div class="content">
 <section id="dashboard" class="view active"><div class="pagehead"><div><h2>Visão geral</h2><p>Seu balcão de comando para bebidas, caixa e clientes.</p></div></div>
 <div class="grid stats"><div class="card stat"><span class="label">Vendas hoje</span><div class="value" id="kToday">R$ 0,00</div><div class="sub" id="kTodaySub">0 pedidos</div><div class="ico"><i data-lucide="trending-up"></i></div></div><div class="card stat"><span class="label">A receber</span><div class="value" id="kReceivable">R$ 0,00</div><div class="sub">clientes em aberto</div><div class="ico"><i data-lucide="clock-3"></i></div></div><div class="card stat"><span class="label">Estoque baixo</span><div class="value" id="kLow">0</div><div class="sub">produtos precisam atenção</div><div class="ico"><i data-lucide="triangle-alert"></i></div></div><div class="card stat"><span class="label">Lucro estimado</span><div class="value" id="kProfit">R$ 0,00</div><div class="sub">vendas pagas − custo</div><div class="ico"><i data-lucide="badge-dollar-sign"></i></div></div></div>
@@ -190,6 +204,9 @@ const money=v=>Number(String(v??0).replace(',','.'))||0;
 let db=JSON.parse(localStorage.getItem(KEY)||'null')||{config:{name:'NUNES BEBIDAS',msg:'Olá, {nome}! Passando para lembrar que seu saldo em aberto é de {valor}. Quando puder, me chama para combinarmos o pagamento. Obrigado!',confirm:true},clients:[],products:[],sales:[],expenses:[],payments:[]};
 async function save(silent=false){localStorage.setItem(KEY,JSON.stringify(db));renderAll(); if(window.firebaseCloud){try{await window.firebaseCloud.save(db);if(!silent)toast('Salvo no Firebase!')}catch(e){console.error(e);if(!silent)toast('Salvo neste aparelho; Firebase indisponível.')}}}
 function toast(t){const x=document.getElementById('toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),2200)}
+let firebaseToastTimer=null;function firebaseNotice(message,kind='success'){const el=document.getElementById('firebaseStatus');if(!el)return;el.textContent=message;el.style.borderColor=kind==='error'?'#9d3939':'#3d663c';el.classList.add('show');clearTimeout(firebaseToastTimer);firebaseToastTimer=setTimeout(()=>el.classList.remove('show'),kind==='loading'?4500:2400)}
+function setLoading(show,title='Preparando seu sistema',copy='Conectando ao Firebase e carregando seus dados com segurança...'){const el=document.getElementById('loadingScreen');if(!el)return;const t=el.querySelector('.loading-title'),c=el.querySelector('.loading-copy');if(t)t.textContent=title;if(c)c.textContent=copy;el.classList.toggle('show',!!show);if(window.lucide)lucide.createIcons()}
+function refreshApp(){setLoading(true,'Atualizando sistema','Recarregando a página e reconectando ao Firebase...');firebaseNotice('Atualizando sistema...','loading');setTimeout(()=>window.location.reload(),250)}
 function esc(s){return String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[m]))}
 function go(view){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(view).classList.add('active');document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===view));document.getElementById('title').textContent={dashboard:'Dashboard',vendas:'Vendas',pedidos:'Pedidos',clientes:'Clientes',estoque:'Estoque',financeiro:'Financeiro',fiado:'Fiado / Cobranças',relatorios:'Relatórios',config:'Configurações'}[view];if(innerWidth<721)document.getElementById('sidebar').classList.remove('open');renderAll()}
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.view));document.getElementById('menu').onclick=()=>document.getElementById('sidebar').classList.toggle('open');
@@ -439,10 +456,12 @@ seed();renderAll();
   passEl.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('authLogin').click()});
 
   onAuthStateChanged(auth,async user=>{
-    if(!user){stopListeners();sync.ready=false;authScreen.style.display='flex';appRoot.classList.add('locked');const el=document.getElementById('firebaseStatus');if(el){el.textContent='🔒 não conectado';el.style.color='#777'}return;}
+    if(!user){stopListeners();sync.ready=false;setLoading(false);authScreen.style.display='flex';appRoot.classList.add('locked');return;}
     authScreen.style.display='none';appRoot.classList.remove('locked');window.firebaseUser=user;sync.uid=user.uid;
-    try{await loadCloud();window.firebaseStatus='connected';const el=document.getElementById('firebaseStatus');if(el){el.textContent='☁️ Firebase conectado';el.style.color='#6aa400'}console.log('Nunes Bebidas sincronizado com Firebase:',user.email,user.uid)}
-    catch(error){window.firebaseStatus='error';const el=document.getElementById('firebaseStatus');if(el){el.textContent='⚠️ Firebase sem acesso';el.style.color='#c33'}console.error(error);if(typeof toast==='function')toast('Login OK, mas não foi possível sincronizar com o Firebase. Confira as Rules.');}
+    setLoading(true,'Carregando seus dados','Conectando ao Firebase e verificando a sincronização...');
+    try{await loadCloud();window.firebaseStatus='connected';console.log('Nunes Bebidas sincronizado com Firebase:',user.email,user.uid);firebaseNotice('☁️ Firebase conectado e dados carregados!');}
+    catch(error){window.firebaseStatus='error';console.error(error);firebaseNotice('⚠️ Não foi possível sincronizar com o Firebase. Confira as Rules.','error');}
+    finally{setLoading(false);if(window.lucide)lucide.createIcons()}
   });
 </script>
 </body></html>
